@@ -10,7 +10,11 @@ type Document struct {
 	OwnerID        string `json:"owner_id"`
 }
 
-var documents = []Document{}
+var documents = []Document{
+	{ID: "1", Title: "Document 1", Content: "This is document 1", Classification: "public", OwnerID: "1"},
+	{ID: "2", Title: "Document 2", Content: "This is document 2", Classification: "internal", OwnerID: "2"},
+	{ID: "3", Title: "Document 3", Content: "This is document 3", Classification: "confidential", OwnerID: "3"},
+}
 
 func AddDocument(doc Document) {
 	documents = append(documents, doc)

@@ -10,7 +10,7 @@ type User struct {
 	Department string `json:"department"`
 }
 
-var users = []User{
+var Users = []User{
 	{ID: "1", Username: "admin", Password: "adminpassword", Role: "admin", Department: "IT"},
 	{ID: "2", Username: "hrmanager", Password: "hrpassword", Role: "manager", Department: "HR"},
 	{ID: "3", Username: "itstaff", Password: "itpassword", Role: "staff", Department: "IT"},
@@ -19,8 +19,17 @@ var users = []User{
 }
 
 func GetUserByUsername(username string) (User, error) {
-	for _, user := range users {
+	for _, user := range Users {
 		if user.Username == username {
+			return user, nil
+		}
+	}
+	return User{}, errors.New("user not found")
+}
+
+func GetUserByID(id string) (User, error) {
+	for _, user := range Users {
+		if user.ID == id {
 			return user, nil
 		}
 	}
