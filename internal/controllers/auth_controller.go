@@ -10,7 +10,11 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
+type contextKey string
+
 var JwtKey = []byte("my_secret_key")
+
+const UserKey contextKey = "user"
 
 type Credentials struct {
 	Username string `json:"username"`

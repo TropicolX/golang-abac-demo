@@ -6,14 +6,11 @@ import (
 	"net/http"
 	"strings"
 
+	"golang-abac-demo/internal/controllers"
 	"golang-abac-demo/internal/models"
 
 	"github.com/dgrijalva/jwt-go"
 )
-
-type contextKey string
-
-const UserKey contextKey = "user"
 
 var jwtKey = []byte("my_secret_key")
 
@@ -38,7 +35,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserKey, claims)
+		ctx := context.WithValue(r.Context(), controllers.UserKey, claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

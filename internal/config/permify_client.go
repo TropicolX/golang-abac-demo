@@ -171,9 +171,6 @@ func WritePermifySchemaAndRelationships() {
 		},
 	}
 
-	// TODO: log attrubutes to see what it looks like
-	log.Printf("Attributes: %v", attributes)
-
 	rr, err := PermifyClient.Data.Write(context.Background(), &v1.DataWriteRequest{
 		TenantId: "t1",
 		Metadata: &v1.DataWriteRequestMetadata{
@@ -184,7 +181,7 @@ func WritePermifySchemaAndRelationships() {
 	})
 
 	if err != nil {
-		log.Fatalf("Failed to write relationships: %v", err)
+		log.Fatalf("Failed to write relationships and attributes: %v", err)
 	}
 
 	SnapToken = rr.SnapToken

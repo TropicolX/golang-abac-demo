@@ -23,6 +23,7 @@ func main() {
 	// Initialize the router
 	r := mux.NewRouter()
 
+	// Log all requests
 	r.Use(middlewares.LoggingMiddleware)
 
 	// Public Routes

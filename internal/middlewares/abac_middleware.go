@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"golang-abac-demo/internal/config"
+	"golang-abac-demo/internal/controllers"
 	"golang-abac-demo/internal/models"
 
 	v1 "github.com/Permify/permify-go/generated/base/v1"
@@ -17,9 +18,8 @@ func ABACMiddleware(permission string) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// get claims from context
-			claims := r.Context().Value(UserKey).(*models.Claims)
+			claims := r.Context().Value(controllers.UserKey).(*models.Claims)
 
-			log.Printf("claims: %v", claims)
 			username := claims.Username
 			user, err := models.GetUserByUsername(username)
 
@@ -37,11 +37,8 @@ func ABACMiddleware(permission string) mux.MiddlewareFunc {
 				"dept": user.Department,
 			}
 
-			// TODO: remove this
-			log.Printf("userId: %s, documentId: %s", username, documentID)
-
-			// Convert map[string]interface{} to *structpb.Struct
 			structData, err := structpb.NewStruct(data)
+
 			if err != nil {
 				log.Fatalf("Failed to create protobuf struct: %v", err)
 			}
@@ -77,7 +74,6 @@ func ABACMiddleware(permission string) mux.MiddlewareFunc {
 				return
 			}
 
-			// descriptive error message
 			log.Printf("Permission denied")
 			http.Error(w, "Forbidden", http.StatusForbidden)
 		})

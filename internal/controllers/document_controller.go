@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"golang-abac-demo/internal/middlewares"
 	"golang-abac-demo/internal/models"
 	"golang-abac-demo/internal/utils"
 	"net/http"
@@ -18,13 +17,14 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := r.Context().Value(middlewares.UserKey).(*models.Claims)
-	doc.OwnerID = user.Username // Set document owner as the user who uploaded it
+	user := r.Context().Value(UserKey).(*models.Claims)
+	doc.OwnerID = user.Id                            // Set document owner as the user who uploaded it
+	doc.ID = string(rune(len(models.Documents) + 1)) // Generate document ID
 
 	// Add document to repository (this would be replaced with actual DB call)
 	models.AddDocument(doc)
 
-	utils.InfoLogger.Printf("User %s uploaded document %s", user.Username, doc.ID)
+	utils.InfoLogger.Printf("User '%s' uploaded document %s", user.Username, doc.ID)
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Document uploaded successfully"})
@@ -33,7 +33,7 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 func ViewDocument(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	docID := params["id"]
-	user := r.Context().Value(middlewares.UserKey).(*models.Claims)
+	user := r.Context().Value(UserKey).(*models.Claims)
 
 	// Fetch document from repository (this would be replaced with actual DB call)
 	doc, err := models.GetDocumentByID(docID)
@@ -42,7 +42,7 @@ func ViewDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.InfoLogger.Printf("User %s viewed document %s", user.Username, doc.ID)
+	utils.InfoLogger.Printf("User '%s' viewed document %s", user.Username, doc.ID)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(doc)
@@ -51,7 +51,7 @@ func ViewDocument(w http.ResponseWriter, r *http.Request) {
 func EditDocument(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	docID := params["id"]
-	user := r.Context().Value(middlewares.UserKey).(*models.Claims)
+	user := r.Context().Value(UserKey).(*models.Claims)
 
 	var doc models.Document
 	err := json.NewDecoder(r.Body).Decode(&doc)
@@ -72,7 +72,7 @@ func EditDocument(w http.ResponseWriter, r *http.Request) {
 	existingDoc.Content = doc.Content
 	models.UpdateDocument(existingDoc)
 
-	utils.InfoLogger.Printf("User %s edited document %s", user.Username, doc.ID)
+	utils.InfoLogger.Printf("User '%s' edited document %s", user.Username, doc.ID)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Document edited successfully"})
@@ -81,7 +81,7 @@ func EditDocument(w http.ResponseWriter, r *http.Request) {
 func DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	docID := params["id"]
-	user := r.Context().Value(middlewares.UserKey).(*models.Claims)
+	user := r.Context().Value(UserKey).(*models.Claims)
 
 	// Fetch document from repository (this would be replaced with actual DB call)
 	doc, err := models.GetDocumentByID(docID)
@@ -93,7 +93,7 @@ func DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	// Delete document from repository (this would be replaced with actual DB call)
 	models.DeleteDocument(docID)
 
-	utils.InfoLogger.Printf("User %s deleted document %s", user.Username, doc.ID)
+	utils.InfoLogger.Printf("User '%s' deleted document %s", user.Username, doc.ID)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Document deleted successfully"})
