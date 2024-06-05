@@ -30,8 +30,23 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doc.OwnerID = user.ID                              // Set document owner as the user who uploaded it
-	doc.ID = strconv.Itoa((len(models.Documents) + 1)) // Generate document ID
+	doc.OwnerID = user.ID
+	noOfDocs := len(models.Documents)
+
+	if noOfDocs == 0 {
+		doc.ID = "1"
+	} else {
+		lastDocIndex := noOfDocs - 1
+		lastDocID, err := strconv.Atoi(models.Documents[lastDocIndex].ID)
+
+		if err != nil {
+			log.Printf("Failed to fetch last document ID: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		doc.ID = strconv.Itoa(lastDocID + 1)
+	}
 
 	// Add document to repository (this would be replaced with actual DB call)
 	models.AddDocument(doc)
