@@ -1,11 +1,16 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
+	"golang-abac-demo/internal/config"
 	"golang-abac-demo/internal/models"
 	"golang-abac-demo/internal/utils"
+	"log"
 	"net/http"
+	"strconv"
 
+	v1 "github.com/Permify/permify-go/generated/base/v1"
 	"github.com/gorilla/mux"
 )
 
@@ -17,12 +22,66 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := r.Context().Value(UserKey).(*models.Claims)
-	doc.OwnerID = user.Id                            // Set document owner as the user who uploaded it
-	doc.ID = string(rune(len(models.Documents) + 1)) // Generate document ID
+	claims := r.Context().Value(UserKey).(*models.Claims)
+	user, err := models.GetUserByUsername(claims.Username)
+	if err != nil {
+		log.Printf("Failed to fetch user: %v", err)
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	doc.OwnerID = user.ID                              // Set document owner as the user who uploaded it
+	doc.ID = strconv.Itoa((len(models.Documents) + 1)) // Generate document ID
 
 	// Add document to repository (this would be replaced with actual DB call)
 	models.AddDocument(doc)
+
+	// Add document to Permify
+	tuples := []*v1.Tuple{{
+		Entity: &v1.Entity{
+			Type: "document",
+			Id:   doc.ID,
+		},
+		Relation: "owner",
+		Subject: &v1.Subject{
+			Type: "user",
+			Id:   user.ID,
+		},
+	}}
+
+	attributes := []*v1.Attribute{
+		{
+			Entity: &v1.Entity{
+				Type: "document",
+				Id:   doc.ID,
+			},
+			Attribute: "classification",
+			Value:     config.ConvertStringToAny(doc.Classification),
+		},
+		{
+			Entity: &v1.Entity{
+				Type: "document",
+				Id:   doc.ID,
+			},
+			Attribute: "department",
+			Value:     config.ConvertStringToAny(user.Department),
+		},
+	}
+
+	_, err = config.PermifyClient.Data.Write(context.Background(), &v1.DataWriteRequest{
+		TenantId: "t1",
+		Metadata: &v1.DataWriteRequestMetadata{
+			SchemaVersion: config.SchemaVersion,
+		},
+		Tuples:     tuples,
+		Attributes: attributes,
+	})
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to write relationship to Permify"})
+		return
+	}
 
 	utils.InfoLogger.Printf("User '%s' uploaded document %s", user.Username, doc.ID)
 
@@ -33,16 +92,17 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 func ViewDocument(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	docID := params["id"]
-	user := r.Context().Value(UserKey).(*models.Claims)
+	claims := r.Context().Value(UserKey).(*models.Claims)
 
 	// Fetch document from repository (this would be replaced with actual DB call)
 	doc, err := models.GetDocumentByID(docID)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
+		http.Error(w, "Document not found", http.StatusNotFound)
 		return
 	}
 
-	utils.InfoLogger.Printf("User '%s' viewed document %s", user.Username, doc.ID)
+	utils.InfoLogger.Printf("User '%s' viewed document %s", claims.Username, doc.ID)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(doc)
@@ -51,7 +111,7 @@ func ViewDocument(w http.ResponseWriter, r *http.Request) {
 func EditDocument(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	docID := params["id"]
-	user := r.Context().Value(UserKey).(*models.Claims)
+	claims := r.Context().Value(UserKey).(*models.Claims)
 
 	var doc models.Document
 	err := json.NewDecoder(r.Body).Decode(&doc)
@@ -64,6 +124,7 @@ func EditDocument(w http.ResponseWriter, r *http.Request) {
 	existingDoc, err := models.GetDocumentByID(docID)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
+		http.Error(w, "Document not found", http.StatusNotFound)
 		return
 	}
 
@@ -72,7 +133,7 @@ func EditDocument(w http.ResponseWriter, r *http.Request) {
 	existingDoc.Content = doc.Content
 	models.UpdateDocument(existingDoc)
 
-	utils.InfoLogger.Printf("User '%s' edited document %s", user.Username, doc.ID)
+	utils.InfoLogger.Printf("User '%s' edited document %s", claims.Username, doc.ID)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Document edited successfully"})
@@ -81,19 +142,44 @@ func EditDocument(w http.ResponseWriter, r *http.Request) {
 func DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	docID := params["id"]
-	user := r.Context().Value(UserKey).(*models.Claims)
+	claims := r.Context().Value(UserKey).(*models.Claims)
 
 	// Fetch document from repository (this would be replaced with actual DB call)
 	doc, err := models.GetDocumentByID(docID)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
+		http.Error(w, "Document not found", http.StatusNotFound)
 		return
 	}
 
 	// Delete document from repository (this would be replaced with actual DB call)
 	models.DeleteDocument(docID)
 
-	utils.InfoLogger.Printf("User '%s' deleted document %s", user.Username, doc.ID)
+	// Delete document from Permify
+	_, err = config.PermifyClient.Data.Delete(context.Background(), &v1.DataDeleteRequest{
+		TenantId: "t1",
+		TupleFilter: &v1.TupleFilter{
+			Entity: &v1.EntityFilter{
+				Type: "document",
+				Ids:  []string{doc.ID},
+			},
+		},
+		AttributeFilter: &v1.AttributeFilter{
+			Entity: &v1.EntityFilter{
+				Type: "document",
+				Ids:  []string{doc.ID},
+			},
+			Attributes: []string{"classification", "department"},
+		},
+	})
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to delete document from Permify"})
+		return
+	}
+
+	utils.InfoLogger.Printf("User '%s' deleted document %s", claims.Username, doc.ID)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Document deleted successfully"})

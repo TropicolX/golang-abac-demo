@@ -17,21 +17,27 @@ import (
 func ABACMiddleware(permission string) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// get claims from context
 			claims := r.Context().Value(controllers.UserKey).(*models.Claims)
-
 			username := claims.Username
 			user, err := models.GetUserByUsername(username)
 
 			if err != nil {
-				// log error message
-				log.Printf("Failed to get user by ID: %v", err)
+				log.Printf("Failed to fetch user: %v", err)
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
 
 			vars := mux.Vars(r)
 			documentID := vars["id"]
+
+			// check if document exists
+			_, docErr := models.GetDocumentByID(documentID)
+
+			if docErr != nil {
+				log.Printf("Failed to fetch document: %v", docErr)
+				http.Error(w, "Document not found", http.StatusNotFound)
+				return
+			}
 
 			data := map[string]interface{}{
 				"dept": user.Department,

@@ -26,7 +26,7 @@ func GetDocumentByID(id string) (Document, error) {
 			return doc, nil
 		}
 	}
-	return Document{}, errors.New("document not found")
+	return Document{}, errors.New("Document not found")
 }
 
 func UpdateDocument(updatedDoc Document) {

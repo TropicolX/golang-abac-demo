@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"golang-abac-demo/internal/models"
+	"golang-abac-demo/internal/utils"
 
 	"github.com/dgrijalva/jwt-go"
 )
@@ -56,6 +57,8 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	utils.InfoLogger.Printf("User '%s' logged in", user.Username)
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful", "token": tokenString})
 }
