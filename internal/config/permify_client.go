@@ -15,14 +15,6 @@ var PermifyClient *permify.Client
 var SchemaVersion string
 var SnapToken string
 
-func ConvertStringToAny(s string) *anypb.Any {
-	anyValue, err := anypb.New(&v1.StringValue{Data: s})
-	if err != nil {
-		log.Fatalf("Failed to create Any from string: %v", err)
-	}
-	return anyValue
-}
-
 func InitPermifyClient() {
 	client, err := permify.NewClient(
 		permify.Config{
@@ -36,6 +28,14 @@ func InitPermifyClient() {
 		PermifyClient = client
 		log.Println("Permify client initialized successfully")
 	}
+}
+
+func ConvertStringToAny(s string) *anypb.Any {
+	anyValue, err := anypb.New(&v1.StringValue{Data: s})
+	if err != nil {
+		log.Fatalf("Failed to create Any from string: %v", err)
+	}
+	return anyValue
 }
 
 func WritePermifySchemaAndRelationships() {
