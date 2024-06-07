@@ -42,11 +42,10 @@ The Golang ABAC Demo is an internal document management system that illustrates 
 
 2. **Set up Permify**
 
-   Pull and run the Permify Docker container:
+   Run the Permify Docker container:
 
    ```sh
-   docker pull permify/permify
-   docker run -d -p 3476:3476 --name permify permify/permify
+   docker run -p 3476:3476 -p 3478:3478  ghcr.io/permify/permify serve
    ```
 
 3. **Install Go dependencies**
