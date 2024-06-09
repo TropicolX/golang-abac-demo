@@ -24,3 +24,12 @@ func GetUserByUsername(username string) (User, error) {
 	}
 	return User{}, errors.New("user not found")
 }
+
+func GetUserByID(id string) (User, error) {
+	for _, user := range Users {
+		if user.ID == id {
+			return user, nil
+		}
+	}
+	return User{}, errors.New("user not found")
+}
