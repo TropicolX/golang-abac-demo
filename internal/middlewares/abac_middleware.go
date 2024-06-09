@@ -52,7 +52,7 @@ func ABACMiddleware(permission string) mux.MiddlewareFunc {
 			cr, err := config.PermifyClient.Permission.Check(context.Background(), &v1.PermissionCheckRequest{
 				TenantId: "t1",
 				Metadata: &v1.PermissionCheckRequestMetadata{
-					SnapToken: "v1",
+					SnapToken: config.SnapToken,
 					Depth:     50,
 				},
 				Entity: &v1.Entity{

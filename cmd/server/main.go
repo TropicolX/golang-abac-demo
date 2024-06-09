@@ -17,8 +17,11 @@ func main() {
 	// Initialize Permify client
 	config.InitPermifyClient()
 
-	// Write Permify schema and relationships
-	config.WritePermifySchemaAndRelationships()
+	// Write Permify schema
+	config.WritePermifySchema()
+
+	// Sync Permify with the database
+	config.SyncPermify()
 
 	// Initialize the router
 	r := mux.NewRouter()

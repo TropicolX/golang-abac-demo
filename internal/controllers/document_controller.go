@@ -71,7 +71,7 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 				Id:   doc.ID,
 			},
 			Attribute: "classification",
-			Value:     config.ConvertStringToAny(doc.Classification),
+			Value:     utils.ConvertStringToAny(doc.Classification),
 		},
 		{
 			Entity: &v1.Entity{
@@ -79,7 +79,7 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 				Id:   doc.ID,
 			},
 			Attribute: "department",
-			Value:     config.ConvertStringToAny(user.Department),
+			Value:     utils.ConvertStringToAny(user.Department),
 		},
 	}
 

@@ -2,13 +2,14 @@ package config
 
 import (
 	"context"
+	"golang-abac-demo/internal/models"
+	"golang-abac-demo/internal/utils"
 	"log"
 
 	v1 "github.com/Permify/permify-go/generated/base/v1"
 	permify "github.com/Permify/permify-go/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var PermifyClient *permify.Client
@@ -30,15 +31,7 @@ func InitPermifyClient() {
 	}
 }
 
-func ConvertStringToAny(s string) *anypb.Any {
-	anyValue, err := anypb.New(&v1.StringValue{Data: s})
-	if err != nil {
-		log.Fatalf("Failed to create Any from string: %v", err)
-	}
-	return anyValue
-}
-
-func WritePermifySchemaAndRelationships() {
+func WritePermifySchema() {
 	// Write schema
 	schema := `
 		entity user {}
@@ -81,110 +74,140 @@ func WritePermifySchemaAndRelationships() {
 
 	SchemaVersion = sr.SchemaVersion
 	log.Printf("Schema version %s written successfully", SchemaVersion)
+}
 
-	// Write relationships
-	tuples := []*v1.Tuple{
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "1",
-			},
-			Relation: "owner",
-			Subject: &v1.Subject{
-				Type: "user",
-				Id:   "1",
-			},
-		},
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "2",
-			},
-			Relation: "owner",
-			Subject: &v1.Subject{
-				Type: "user",
-				Id:   "2",
-			},
-		},
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "3",
-			},
-			Relation: "owner",
-			Subject: &v1.Subject{
-				Type: "user",
-				Id:   "3",
-			},
-		},
-	}
-
-	// Write attributes
-	attributes := []*v1.Attribute{
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "1",
-			},
-			Attribute: "classification",
-			Value:     ConvertStringToAny("public"),
-		},
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "1",
-			},
-			Attribute: "department",
-			Value:     ConvertStringToAny("IT"),
-		},
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "2",
-			},
-			Attribute: "classification",
-			Value:     ConvertStringToAny("internal"),
-		},
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "2",
-			},
-			Attribute: "department",
-			Value:     ConvertStringToAny("HR"),
-		},
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "3",
-			},
-			Attribute: "classification",
-			Value:     ConvertStringToAny("confidential"),
-		},
-		{
-			Entity: &v1.Entity{
-				Type: "document",
-				Id:   "3",
-			},
-			Attribute: "department",
-			Value:     ConvertStringToAny("Sales"),
-		},
-	}
-
-	rr, err := PermifyClient.Data.Write(context.Background(), &v1.DataWriteRequest{
+func SyncPermify() {
+	// Read current relationships from Permify
+	rr, err := PermifyClient.Data.ReadRelationships(context.Background(), &v1.RelationshipReadRequest{
 		TenantId: "t1",
-		Metadata: &v1.DataWriteRequestMetadata{
-			SchemaVersion: sr.SchemaVersion,
+		Metadata: &v1.RelationshipReadRequestMetadata{
+			SnapToken: SnapToken,
 		},
-		Tuples:     tuples,
-		Attributes: attributes,
+		Filter: &v1.TupleFilter{
+			Entity: &v1.EntityFilter{
+				Type: "document",
+			},
+			Subject: &v1.SubjectFilter{
+				Type: "user",
+			},
+		},
 	})
 
 	if err != nil {
-		log.Fatalf("Failed to write relationships and attributes: %v", err)
+		log.Fatalf("Failed to read relationships from Permify: %v", err)
 	}
 
-	SnapToken = rr.SnapToken
+	// Map of existing document IDs in Permify
+	existingDocumentIDs := make([]string, 0)
+	nonExistingDocumentIDs := make([]string, 0)
 
-	log.Printf("Data tuples written successfully\nSnap token: %s", SnapToken)
+	for _, tuple := range rr.Tuples {
+		if tuple.Entity.Type == "document" {
+			_, err := models.GetDocumentByID(tuple.Entity.Id)
+
+			if err != nil {
+				nonExistingDocumentIDs = append(nonExistingDocumentIDs, tuple.Entity.Id)
+			} else {
+				existingDocumentIDs = append(existingDocumentIDs, tuple.Entity.Id)
+			}
+		}
+	}
+
+	// Delete documents that don't exist in the database
+	if len(nonExistingDocumentIDs) > 0 {
+		rr, err := PermifyClient.Data.Delete(context.Background(), &v1.DataDeleteRequest{
+			TenantId: "t1",
+			TupleFilter: &v1.TupleFilter{
+				Entity: &v1.EntityFilter{
+					Type: "document",
+					Ids:  nonExistingDocumentIDs,
+				},
+			},
+			AttributeFilter: &v1.AttributeFilter{
+				Entity: &v1.EntityFilter{
+					Type: "document",
+					Ids:  nonExistingDocumentIDs,
+				},
+				Attributes: []string{"classification", "department"},
+			},
+		})
+
+		if err != nil {
+			log.Fatalf("Failed to delete orphaned documents from Permify: %v", err)
+		}
+
+		SnapToken = rr.SnapToken
+		log.Printf("Orphaned documents deleted from Permify successfully\nSnap token: %s", SnapToken)
+
+	} else {
+		log.Println("No orphaned documents to delete from Permify")
+	}
+
+	// Add missing documents to Permify
+	var tuples []*v1.Tuple
+	var attributes []*v1.Attribute
+
+	for _, doc := range models.Documents {
+		if !utils.ContainsString(existingDocumentIDs, doc.ID) {
+			tuples = append(tuples, &v1.Tuple{
+				Entity: &v1.Entity{
+					Type: "document",
+					Id:   doc.ID,
+				},
+				Relation: "owner",
+				Subject: &v1.Subject{
+					Type: "user",
+					Id:   doc.OwnerID,
+				},
+			})
+
+			user, err := models.GetUserByID(doc.OwnerID)
+
+			if err != nil {
+				log.Fatalf("Failed to fetch user by ID: %v", err)
+			}
+
+			attributes = append(attributes, []*v1.Attribute{
+				{
+					Entity: &v1.Entity{
+						Type: "document",
+						Id:   doc.ID,
+					},
+					Attribute: "classification",
+					Value:     utils.ConvertStringToAny(doc.Classification),
+				},
+				{
+					Entity: &v1.Entity{
+						Type: "document",
+						Id:   doc.ID,
+					},
+					Attribute: "department",
+					Value:     utils.ConvertStringToAny(user.Department),
+				},
+			}...)
+		}
+	}
+
+	// Write missing documents to Permify
+	if len(tuples) > 0 {
+		rr, err := PermifyClient.Data.Write(context.Background(), &v1.DataWriteRequest{
+			TenantId: "t1",
+			Metadata: &v1.DataWriteRequestMetadata{
+				SchemaVersion: SchemaVersion,
+			},
+			Tuples:     tuples,
+			Attributes: attributes,
+		})
+
+		if err != nil {
+			log.Fatalf("Failed to write missing documents to Permify: %v", err)
+		}
+
+		SnapToken = rr.SnapToken
+		log.Printf("Missing documents written successfully\nSnap token: %s", SnapToken)
+	} else {
+		log.Println("No missing documents to write to Permify")
+	}
+
+	log.Println("Permify synced successfully")
 }
