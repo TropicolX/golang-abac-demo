@@ -14,6 +14,7 @@ var Documents = []Document{
 	{ID: "1", Title: "Document 1", Content: "This is document 1", Classification: "public", OwnerID: "1"},
 	{ID: "2", Title: "Document 2", Content: "This is document 2", Classification: "internal", OwnerID: "2"},
 	{ID: "3", Title: "Document 3", Content: "This is document 3", Classification: "confidential", OwnerID: "3"},
+	{ID: "4", Title: "Document 4", Content: "This is document 4", Classification: "internal", OwnerID: "4"},
 }
 
 func AddDocument(doc Document) {

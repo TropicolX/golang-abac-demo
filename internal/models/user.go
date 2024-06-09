@@ -13,7 +13,8 @@ type User struct {
 var Users = []User{
 	{ID: "1", Username: "admin", Password: "adminpassword", Role: "admin", Department: "IT"},
 	{ID: "2", Username: "hrmanager", Password: "hrpassword", Role: "manager", Department: "HR"},
-	{ID: "3", Username: "salesstaff", Password: "itpassword", Role: "staff", Department: "Sales"},
+	{ID: "3", Username: "salesstaff", Password: "salespassword", Role: "staff", Department: "Sales"},
+	{ID: "4", Username: "itstaff", Password: "itpassword", Role: "staff", Department: "IT"},
 }
 
 func GetUserByUsername(username string) (User, error) {
